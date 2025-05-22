@@ -16,7 +16,7 @@ The following R code chunk performs the core logic:
 3.  Connects to Posit Connect and updates the designated pin with the new data.
 
 ```{r}
-# Install and load necessary R packages if not already installed
+# Load necessary R packages if not already installed
 # install.packages(c("duckdb", "DBI", "pins", "dplyr"))
 library(duckdb)       # For connecting to MotherDuck
 library(DBI)          # Database interface for R
@@ -49,62 +49,82 @@ update_pin_from_motherduck <- function() {
   
   # 1. Connect to MotherDuck
   con <- NULL # Initialize connection object to NULL
-  tryCatch({
-    message("Connecting to MotherDuck...")
-    # Construct the MotherDuck connection string with the token
-    con <- dbConnect(duckdb::duckdb(), 
-                     paste0("md:?token=", MOTHERDUCK_TOKEN))
-    message("Successfully connected to MotherDuck.")
-  }, error = function(e) {
-    stop(paste0("Error connecting to MotherDuck: ", e$message))
-  })
+  tryCatch(
+    expr = {
+      message("Connecting to MotherDuck...")
+      # Construct the MotherDuck connection string with the token
+      con <- dbConnect(duckdb::duckdb(), 
+                       paste0("md:?token=", MOTHERDUCK_TOKEN))
+      message("Successfully connected to MotherDuck.")
+    },
+    error = function(e) {
+      stop(paste0("Error connecting to MotherDuck: ", e$message))
+    },
+    finally = { # Correct placement of 'finally' within tryCatch
+      # Ensure the connection is closed, regardless of success or failure
+      if (!is.null(con) && dbIsValid(con)) {
+        dbDisconnect(con, shutdown = TRUE)
+        message("MotherDuck connection closed.")
+      }
+    }
+  )
 
   # 2. Retrieve Data from MotherDuck
   df_motherduck <- NULL # Initialize data frame object to NULL
-  tryCatch({
-    query <- paste0("SELECT * FROM ", MOTHERDUCK_TABLE_NAME)
-    message(paste0("Executing query: ", query))
-    df_motherduck <- dbGetQuery(con, query)
-    message(paste0("Successfully retrieved data from table '", MOTHERDUCK_TABLE_NAME, "'."))
-    message("Retrieved DataFrame head:")
-    print(head(df_motherduck))
-  }, error = function(e) {
-    stop(paste0("Error retrieving data from MotherDuck: ", e$message))
-  }) finally({
-    # Ensure the connection is closed, regardless of success or failure
-    if (!is.null(con) && dbIsValid(con)) {
-      dbDisconnect(con, shutdown = TRUE)
-      message("MotherDuck connection closed.")
+  tryCatch(
+    expr = {
+      query <- paste0("SELECT * FROM ", MOTHERDUCK_TABLE_NAME)
+      message(paste0("Executing query: ", query))
+      df_motherduck <- dbGetQuery(con, query)
+      message(paste0("Successfully retrieved data from table '", MOTHERDUCK_TABLE_NAME, "'."))
+      message("Retrieved DataFrame head:")
+      print(head(df_motherduck))
+    },
+    error = function(e) {
+      stop(paste0("Error retrieving data from MotherDuck: ", e$message))
+    },
+    finally = { # Correct placement of 'finally' within tryCatch
+      # Ensure the connection is closed, regardless of success or failure
+      # Re-connecting to ensure 'con' is valid after the previous tryCatch block might be needed
+      # if it was closed in the previous finally. For this specific flow,
+      # we assume 'con' is still open from the first tryCatch.
+      if (!is.null(con) && dbIsValid(con)) {
+        dbDisconnect(con, shutdown = TRUE)
+        message("MotherDuck connection closed.")
+      }
     }
-  })
+  )
 
   # 3. Connect to Posit Connect Board and Update Pin
-  tryCatch({
-    message(paste0("Connecting to Posit Connect server: ", CONNECT_SERVER_URL))
-    
-    # Initialize the Posit Connect board
-    # The pins package will automatically use CONNECT_API_KEY and CONNECT_SERVER_URL
-    # from environment variables if they are set.
-    board <- board_connect(
-      server = CONNECT_SERVER_URL,
-      key = CONNECT_API_KEY
-    )
-    message("Successfully connected to Posit Connect board.")
+  tryCatch(
+    expr = {
+      message(paste0("Connecting to Posit Connect server: ", CONNECT_SERVER_URL))
+      
+      # Initialize the Posit Connect board
+      # The pins package will automatically use CONNECT_API_KEY and CONNECT_SERVER_URL
+      # from environment variables if they are set.
+      board <- board_connect(
+        server = CONNECT_SERVER_URL,
+        key = CONNECT_API_KEY
+      )
+      message("Successfully connected to Posit Connect board.")
 
-    message(paste0("Updating pin: '", PIN_NAME, "'"))
-    # Write the data frame to the pin.
-    board %>% pin_write(
-      x = df_motherduck,
-      name = PIN_NAME,
-      description = paste0("Data from MotherDuck table '", MOTHERDUCK_TABLE_NAME, "'"),
-      type = "csv", 
-      # versioned = TRUE # Uncomment if you want to keep multiple versions of the pin
-    )
-    message(paste0("Pin '", PIN_NAME, "' updated successfully on Posit Connect."))
-
-  }, error = function(e) {
-    stop(paste0("Error updating Posit Connect pin: ", e$message))
-  })
+      message(paste0("Updating pin: '", PIN_NAME, "'"))
+      # Write the data frame to the pin.
+      board %>% pin_write(
+        x = df_motherduck,
+        name = PIN_NAME,
+        description = paste0("Data from MotherDuck table '", MOTHERDUCK_TABLE_NAME, "'"),
+        type = "csv",
+        # versioned = TRUE # Uncomment if you want to keep multiple versions of the pin
+      )
+      message(paste0("Pin '", PIN_NAME, "' updated successfully on Posit Connect."))
+    },
+    error = function(e) {
+      stop(paste0("Error updating Posit Connect pin: ", e$message))
+    }
+    # No finally block here as no connection needs explicit closing
+  )
 
   message("Data update process completed.")
 }
@@ -112,12 +132,5 @@ update_pin_from_motherduck <- function() {
 
   update_pin_from_motherduck()
 
-
 ```
-
-
-
-
-
-
-
+How to Redeploy the Corrected Quarto DocumentUpdate your local .qmd file: Replace the content of your motherduck_updater.qmd file with the corrected code above.Update renv.lock (if needed): If you added/removed packages (unlikely for this specific fix), run renv::snapshot().Commit and Push to GitHub: Commit the updated motherduck_updater.qmd (and renv.lock if changed) to your GitHub repository.Redeploy on Posit Connect: Since your Posit Connect content is linked to GitHub, it should automatically detect the changes and attempt to redeploy the updated version. You can verify this in the "History" tab of your content on Posit Connect. If it doesn't automatically redeploy after a minute or two, you can usually force a redeploy from the "Source" tab.Once the updated version is deployed, try running it manually on Posit Connect again (from the "Overview" tab, click "Run Now") and check the "Logs" to confirm it executes without the finally error.
