@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>SharePoint Data to Posit Connect Pin Updater</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="DataUpdater_files/libs/clipboard/clipboard.min.js"></script>
+<script src="DataUpdater_files/libs/quarto-html/quarto.js"></script>
+<script src="DataUpdater_files/libs/quarto-html/popper.min.js"></script>
+<script src="DataUpdater_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="DataUpdater_files/libs/quarto-html/anchor.min.js"></script>
+<link href="DataUpdater_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="DataUpdater_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="DataUpdater_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="DataUpdater_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="DataUpdater_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">SharePoint Data to Posit Connect Pin Updater</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<p>This Quarto document contains an R script designed to fetch data from a specified SharePoint folder and update a corresponding pin on Posit Connect. This automation is particularly useful for ensuring that Shiny applications always have access to the latest data without manual intervention.</p>
+<p>The script leverages environment variables for sensitive information (SharePoint credentials, Posit Connect API key), which is a best practice for secure deployment on platforms like Posit Connect.</p>
+<section id="r-script-for-data-update" class="level2">
+<h2 class="anchored" data-anchor-id="r-script-for-data-update">R Script for Data Update</h2>
+<p>The following R code chunk performs the core logic: 1. Authenticates with SharePoint using client credentials. 2. Downloads the specified Excel file from SharePoint. 3. Reads the Excel data into an R data frame. 4. Connects to Posit Connect and updates the designated pin with the new data.</p>
+</section>
+<section id="install-and-load-necessary-r-packages-if-not-already-installed" class="level1">
+<h1>Install and load necessary R packages if not already installed</h1>
+</section>
+<section id="install.packagescmicrosoft365r-readxl-pins-dplyr" class="level1">
+<h1>install.packages(c(“Microsoft365R”, “readxl”, “pins”, “dplyr”))</h1>
+<p>library(Microsoft365R) # For connecting to SharePoint library(readxl) # For reading Excel files library(pins) # For interacting with Posit Connect pins library(dplyr) # For general data manipulation (optional, but good practice)</p>
+</section>
+<section id="configuration-load-from-environment-variables-for-security" class="level1">
+<h1>— Configuration (Load from Environment Variables for Security) —</h1>
+</section>
+<section id="it-is-crucial-to-store-sensitive-information-like-client-ids-and-secrets" class="level1">
+<h1>It is CRUCIAL to store sensitive information like client IDs and secrets</h1>
+</section>
+<section id="as-environment-variables-on-posit-connect-not-directly-in-the-script." class="level1">
+<h1>as environment variables on Posit Connect, not directly in the script.</h1>
+</section>
+<section id="sharepoint-configuration" class="level1">
+<h1>SharePoint Configuration</h1>
+</section>
+<section id="ensure-these-environment-variables-are-set-on-posit-connect" class="level1">
+<h1>Ensure these environment variables are set on Posit Connect</h1>
+</section>
+<section id="example-sharepoint_site_url-httpshealthireland.sharepoint.comsitesdatahub" class="level1">
+<h1>Example: SHAREPOINT_SITE_URL = “<a href="https://healthireland.sharepoint.com/sites/DataHub">https://healthireland.sharepoint.com/sites/DataHub</a>”</h1>
+<p>SHAREPOINT_SITE_URL &lt;- Sys.getenv(“SHAREPOINT_SITE_URL”) SHAREPOINT_CLIENT_ID &lt;- Sys.getenv(“SHAREPOINT_CLIENT_ID”) SHAREPOINT_CLIENT_SECRET &lt;- Sys.getenv(“SHAREPOINT_CLIENT_SECRET”)</p>
+</section>
+<section id="the-path-to-the-folder-within-the-sharepoint-sites-document-library" class="level1">
+<h1>The path to the folder within the SharePoint site’s document library</h1>
+</section>
+<section id="for-shared-documentsdatarepositorytrolleygarmedmodus.xlsx-the-folder-path-is-shared-documentsdatarepositorytrolleygar" class="level1">
+<h1>For ‘Shared Documents/DataRepository/TrolleyGAR/medmodus.xlsx’, the folder path is ‘Shared Documents/DataRepository/TrolleyGAR’</h1>
+<p>SHAREPOINT_FOLDER_PATH &lt;- Sys.getenv(“SHAREPOINT_FOLDER_PATH”, “Shared Documents/DataRepository/TrolleyGAR”) # The name of the file within that folder SHAREPOINT_FILE_NAME &lt;- Sys.getenv(“SHAREPOINT_FILE_NAME”, “medmodus.xlsx”)</p>
+</section>
+<section id="posit-connect-pin-configuration" class="level1">
+<h1>Posit Connect Pin Configuration</h1>
+</section>
+<section id="these-are-typically-automatically-picked-up-by-pins-if-set-on-connect" class="level1">
+<h1>These are typically automatically picked up by ‘pins’ if set on Connect,</h1>
+</section>
+<section id="but-explicitly-defining-them-ensures-clarity." class="level1">
+<h1>but explicitly defining them ensures clarity.</h1>
+</section>
+<section id="example-connect_server_url-httpsconnect.yourcompany.com" class="level1">
+<h1>Example: CONNECT_SERVER_URL = “<a href="https://connect.yourcompany.com">https://connect.yourcompany.com</a>”</h1>
+</section>
+<section id="example-connect_api_key-your_api_key_here" class="level1">
+<h1>Example: CONNECT_API_KEY = “your_api_key_here”</h1>
+<p>CONNECT_SERVER_URL &lt;- Sys.getenv(“CONNECT_SERVER_URL”) CONNECT_API_KEY &lt;- Sys.getenv(“CONNECT_API_KEY”) PIN_NAME &lt;- Sys.getenv(“PIN_NAME”, “medmodus_trolleygar_data”) # Name of the pin to update</p>
+</section>
+<section id="main-script-logic" class="level1">
+<h1>— Main Script Logic —</h1>
+<p>update_pin_from_sharepoint &lt;- function() { message(“Starting data update process…”)</p>
+<p># 1. Authenticate and Connect to SharePoint tryCatch({ message(paste0(“Connecting to SharePoint site:”, SHAREPOINT_SITE_URL))</p>
+<pre><code># Authenticate using client credentials (app-only authentication)
+# The 'Microsoft365R' package handles the underlying Azure AD authentication
+# using the provided client ID and secret.
+my_sharepoint_site &lt;- get_sharepoint_site(
+  site_url = SHAREPOINT_SITE_URL,
+  tenant = NULL, # Leave NULL for default tenant or specify if needed
+  app = SHAREPOINT_CLIENT_ID,
+  password = SHAREPOINT_CLIENT_SECRET,
+  aad_host = "[https://login.microsoftonline.com/](https://login.microsoftonline.com/)" # Default Azure AD host
+)
+
+message("Successfully connected to SharePoint.")</code></pre>
+<p>}, error = function(e) { stop(paste0(“Error connecting to SharePoint:”, e$message)) })</p>
+<p># 2. Locate and Download the File temp_file &lt;- tempfile(fileext = “.xlsx”) # Create a temporary file to store the downloaded content</p>
+<p>tryCatch({ message(paste0(“Attempting to download file ‘“, SHAREPOINT_FILE_NAME,”’ from folder ‘“, SHAREPOINT_FOLDER_PATH,”’”))</p>
+<pre><code># Get the document library (usually "Shared Documents" or "Documents")
+# Then navigate to the specific folder
+drv &lt;- my_sharepoint_site$get_drive() # Get the default drive (usually "Documents")
+
+# Construct the full path to the file within the drive
+# The folder path is relative to the drive root
+file_path_in_sharepoint &lt;- file.path(SHAREPOINT_FOLDER_PATH, SHAREPOINT_FILE_NAME)
+
+# Get the file object
+sharepoint_file &lt;- drv$get_file(file_path_in_sharepoint)
+
+# Download the file content to the temporary file
+sharepoint_file$download(temp_file)
+
+message(paste0("File '", SHAREPOINT_FILE_NAME, "' downloaded successfully to ", temp_file))</code></pre>
+<p>}, error = function(e) { stop(paste0(“Error downloading file from SharePoint:”, e$message)) })</p>
+<p># 3. Load Data into R DataFrame tryCatch({ # Read the Excel file into a data frame df &lt;- read_excel(temp_file) message(“Excel file loaded into DataFrame.”) message(“DataFrame head:”) print(head(df))</p>
+<p>}, error = function(e) { stop(paste0(“Error loading data into DataFrame:”, e$message)) }) finally({ # Ensure the temporary file is removed if (file.exists(temp_file)) { unlink(temp_file) message(“Temporary file removed.”) } })</p>
+<p># 4. Connect to Posit Connect Board and Update Pin tryCatch({ message(paste0(“Connecting to Posit Connect server:”, CONNECT_SERVER_URL))</p>
+<pre><code># Initialize the Posit Connect board
+# The pins package will automatically use CONNECT_API_KEY and CONNECT_SERVER_URL
+# from environment variables if they are set.
+board &lt;- board_connect(
+  server = CONNECT_SERVER_URL,
+  key = CONNECT_API_KEY
+)
+message("Successfully connected to Posit Connect board.")
+
+message(paste0("Updating pin: '", PIN_NAME, "'"))
+# Write the data frame to the pin.
+# 'type="parquet"' is generally recommended for performance and data types.
+board %&gt;% pin_write(
+  x = df,
+  name = PIN_NAME,
+  description = paste0("Data from SharePoint folder '", SHAREPOINT_FOLDER_PATH, 
+                       "' file '", SHAREPOINT_FILE_NAME, "'"),
+  type = "parquet", # Use parquet for efficient storage and retrieval
+  # versioned = TRUE # Uncomment if you want to keep multiple versions of the pin
+)
+message(paste0("Pin '", PIN_NAME, "' updated successfully on Posit Connect."))</code></pre>
+<p>}, error = function(e) { stop(paste0(“Error updating Posit Connect pin:”, e$message)) })</p>
+<p>message(“Data update process completed.”) }</p>
+</section>
+<section id="run-the-update-function-when-the-script-is-executed" class="level1">
+<h1>Run the update function when the script is executed</h1>
+<p>if (interactive()) { # For interactive testing, you might set environment variables locally # Sys.setenv(SHAREPOINT_SITE_URL = “<a href="https://healthireland.sharepoint.com/sites/DataHub">https://healthireland.sharepoint.com/sites/DataHub</a>”) # Sys.setenv(SHAREPOINT_CLIENT_ID = “YOUR_CLIENT_ID”) # Sys.setenv(SHAREPOINT_CLIENT_SECRET = “YOUR_CLIENT_SECRET”) # Sys.setenv(SHAREPOINT_FOLDER_PATH = “Shared Documents/DataRepository/TrolleyGAR”) # Sys.setenv(SHAREPOINT_FILE_NAME = “medmodus.xlsx”) # Sys.setenv(CONNECT_SERVER_URL = “<a href="https://connect.yourcompany.com">https://connect.yourcompany.com</a>”) # Sys.setenv(CONNECT_API_KEY = “YOUR_CONNECT_API_KEY”) # Sys.setenv(PIN_NAME = “medmodus_trolleygar_data”)</p>
+<p>update_pin_from_sharepoint() } else { # For deployment on Posit Connect, ensure environment variables are set there update_pin_from_sharepoint() }</p>
+<p>How to Use This Quarto Document Save the file: Save the content above as a .qmd file (e.g., sharepoint_updater.qmd).</p>
+<p>Dependencies: Ensure you have an renv.lock file in the same directory, or manually manage the R package dependencies (Microsoft365R, readxl, pins, dplyr).</p>
+<p>Azure AD App Registration: Complete the Azure AD App registration steps as detailed in the previous response to get your SHAREPOINT_CLIENT_ID and SHAREPOINT_CLIENT_SECRET.</p>
+<p>Deploy to Posit Connect:</p>
+<p>From your R console, navigate to the directory containing sharepoint_updater.qmd.</p>
+<p>Use rsconnect::deployApp() to publish the Quarto document. Posit Connect will automatically detect it as a Quarto document.</p>
+<p>rsconnect::deployApp( appFile = “sharepoint_updater.qmd”, appName = “sharepoint_data_updater_qmd”, # A unique name for the app on Connect appTitle = “SharePoint Data Pin Updater (Quarto)”, account = “your-connect-server-name”, # The name you set in setAccountInfo server = “<a href="https://your.connect.server.url">https://your.connect.server.url</a>”, forceUpdate = TRUE # Use TRUE if updating an existing deployment )</p>
+<p>Set Environment Variables: On Posit Connect, go to the “Vars” tab for your deployed Quarto document and set the environment variables (SHAREPOINT_SITE_URL, SHAREPOINT_CLIENT_ID, SHAREPOINT_CLIENT_SECRET, SHAREPOINT_FOLDER_PATH, SHAREPOINT_FILE_NAME, CONNECT_SERVER_URL, CONNECT_API_KEY, PIN_NAME). Remember to mark sensitive variables as “Secret.”</p>
+<p>Schedule: Set up a schedule on Posit Connect for the Quarto document to run automatically.</p>
+<p>When this Quarto document runs on Posit Connect, it will execute the R code chunk, download the data, and update the pin. You can then use board %&gt;% pin_read(“medmodus_trolleygar_data”) in your Shiny app to access the latest data.</p>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

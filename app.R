@@ -92,7 +92,8 @@ server <- function(input, output, session) {
 
   # Observe the login button click
   observeEvent(input$login_button, {
-    # Hardcoded credentials for demonstration purposes
+    
+    # Hardcoded credentials Change To DB or FlatFILE later
     valid_username <- "user"
     valid_password <- "password"
 

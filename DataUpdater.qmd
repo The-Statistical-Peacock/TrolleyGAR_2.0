@@ -1,0 +1,199 @@
+---
+title: "SharePoint Data to Posit Connect Pin Updater"
+format: html
+editor: visual
+---
+
+This Quarto document contains an R script designed to fetch data from a specified SharePoint folder and update a corresponding pin on Posit Connect. This automation is particularly useful for ensuring that Shiny applications always have access to the latest data without manual intervention.
+
+The script leverages environment variables for sensitive information (SharePoint credentials, Posit Connect API key), which is a best practice for secure deployment on platforms like Posit Connect.
+
+## R Script for Data Update
+
+The following R code chunk performs the core logic:
+1.  Authenticates with SharePoint using client credentials.
+2.  Downloads the specified Excel file from SharePoint.
+3.  Reads the Excel data into an R data frame.
+4.  Connects to Posit Connect and updates the designated pin with the new data.
+
+```{r}
+# Install and load necessary R packages if not already installed
+# install.packages(c("Microsoft365R", "readxl", "pins", "dplyr"))
+library(Microsoft365R) # For connecting to SharePoint
+library(readxl)       # For reading Excel files
+library(pins)         # For interacting with Posit Connect pins
+library(dplyr)        # For general data manipulation (optional, but good practice)
+
+# --- Configuration (Load from Environment Variables for Security) ---
+# It is CRUCIAL to store sensitive information like client IDs and secrets
+# as environment variables on Posit Connect, not directly in the script.
+
+# SharePoint Configuration
+# Ensure these environment variables are set on Posit Connect
+# Example: SHAREPOINT_SITE_URL = "[https://healthireland.sharepoint.com/sites/DataHub](https://healthireland.sharepoint.com/sites/DataHub)"
+SHAREPOINT_SITE_URL <- Sys.getenv("SHAREPOINT_SITE_URL")
+SHAREPOINT_CLIENT_ID <- Sys.getenv("SHAREPOINT_CLIENT_ID")
+SHAREPOINT_CLIENT_SECRET <- Sys.getenv("SHAREPOINT_CLIENT_SECRET")
+
+# The path to the folder within the SharePoint site's document library
+# For 'Shared Documents/DataRepository/TrolleyGAR/medmodus.xlsx', the folder path is 'Shared Documents/DataRepository/TrolleyGAR'
+SHAREPOINT_FOLDER_PATH <- Sys.getenv("SHAREPOINT_FOLDER_PATH", "Shared Documents/DataRepository/TrolleyGAR")
+# The name of the file within that folder
+SHAREPOINT_FILE_NAME <- Sys.getenv("SHAREPOINT_FILE_NAME", "medmodus.xlsx")
+
+# Posit Connect Pin Configuration
+# These are typically automatically picked up by 'pins' if set on Connect,
+# but explicitly defining them ensures clarity.
+# Example: CONNECT_SERVER_URL = "[https://connect.yourcompany.com](https://connect.yourcompany.com)"
+# Example: CONNECT_API_KEY = "your_api_key_here"
+CONNECT_SERVER_URL <- Sys.getenv("CONNECT_SERVER_URL")
+CONNECT_API_KEY <- Sys.getenv("CONNECT_API_KEY")
+PIN_NAME <- Sys.getenv("PIN_NAME", "medmodus_trolleygar_data") # Name of the pin to update
+
+# --- Main Script Logic ---
+update_pin_from_sharepoint <- function() {
+  message("Starting data update process...")
+
+  # 1. Authenticate and Connect to SharePoint
+  tryCatch({
+    message(paste0("Connecting to SharePoint site: ", SHAREPOINT_SITE_URL))
+    
+    # Authenticate using client credentials (app-only authentication)
+    # The 'Microsoft365R' package handles the underlying Azure AD authentication
+    # using the provided client ID and secret.
+    my_sharepoint_site <- get_sharepoint_site(
+      site_url = SHAREPOINT_SITE_URL,
+      tenant = NULL, # Leave NULL for default tenant or specify if needed
+      app = SHAREPOINT_CLIENT_ID,
+      password = SHAREPOINT_CLIENT_SECRET,
+      aad_host = "[https://login.microsoftonline.com/](https://login.microsoftonline.com/)" # Default Azure AD host
+    )
+    
+    message("Successfully connected to SharePoint.")
+  }, error = function(e) {
+    stop(paste0("Error connecting to SharePoint: ", e$message))
+  })
+
+  # 2. Locate and Download the File
+  temp_file <- tempfile(fileext = ".xlsx") # Create a temporary file to store the downloaded content
+  
+  tryCatch({
+    message(paste0("Attempting to download file '", SHAREPOINT_FILE_NAME, 
+                   "' from folder '", SHAREPOINT_FOLDER_PATH, "'"))
+    
+    # Get the document library (usually "Shared Documents" or "Documents")
+    # Then navigate to the specific folder
+    drv <- my_sharepoint_site$get_drive() # Get the default drive (usually "Documents")
+    
+    # Construct the full path to the file within the drive
+    # The folder path is relative to the drive root
+    file_path_in_sharepoint <- file.path(SHAREPOINT_FOLDER_PATH, SHAREPOINT_FILE_NAME)
+    
+    # Get the file object
+    sharepoint_file <- drv$get_file(file_path_in_sharepoint)
+    
+    # Download the file content to the temporary file
+    sharepoint_file$download(temp_file)
+    
+    message(paste0("File '", SHAREPOINT_FILE_NAME, "' downloaded successfully to ", temp_file))
+
+  }, error = function(e) {
+    stop(paste0("Error downloading file from SharePoint: ", e$message))
+  })
+
+  # 3. Load Data into R DataFrame
+  tryCatch({
+    # Read the Excel file into a data frame
+    df <- read_excel(temp_file)
+    message("Excel file loaded into DataFrame.")
+    message("DataFrame head:")
+    print(head(df))
+
+  }, error = function(e) {
+    stop(paste0("Error loading data into DataFrame: ", e$message))
+  }) finally({
+    # Ensure the temporary file is removed
+    if (file.exists(temp_file)) {
+      unlink(temp_file)
+      message("Temporary file removed.")
+    }
+  })
+
+  # 4. Connect to Posit Connect Board and Update Pin
+  tryCatch({
+    message(paste0("Connecting to Posit Connect server: ", CONNECT_SERVER_URL))
+    
+    # Initialize the Posit Connect board
+    # The pins package will automatically use CONNECT_API_KEY and CONNECT_SERVER_URL
+    # from environment variables if they are set.
+    board <- board_connect(
+      server = CONNECT_SERVER_URL,
+      key = CONNECT_API_KEY
+    )
+    message("Successfully connected to Posit Connect board.")
+
+    message(paste0("Updating pin: '", PIN_NAME, "'"))
+    # Write the data frame to the pin.
+    # 'type="parquet"' is generally recommended for performance and data types.
+    board %>% pin_write(
+      x = df,
+      name = PIN_NAME,
+      description = paste0("Data from SharePoint folder '", SHAREPOINT_FOLDER_PATH, 
+                           "' file '", SHAREPOINT_FILE_NAME, "'"),
+      type = "parquet", # Use parquet for efficient storage and retrieval
+      # versioned = TRUE # Uncomment if you want to keep multiple versions of the pin
+    )
+    message(paste0("Pin '", PIN_NAME, "' updated successfully on Posit Connect."))
+
+  }, error = function(e) {
+    stop(paste0("Error updating Posit Connect pin: ", e$message))
+  })
+
+  message("Data update process completed.")
+}
+
+# Run the update function when the script is executed
+if (interactive()) {
+  # For interactive testing, you might set environment variables locally
+  # Sys.setenv(SHAREPOINT_SITE_URL = "[https://healthireland.sharepoint.com/sites/DataHub](https://healthireland.sharepoint.com/sites/DataHub)")
+  # Sys.setenv(SHAREPOINT_CLIENT_ID = "YOUR_CLIENT_ID")
+  # Sys.setenv(SHAREPOINT_CLIENT_SECRET = "YOUR_CLIENT_SECRET")
+  # Sys.setenv(SHAREPOINT_FOLDER_PATH = "Shared Documents/DataRepository/TrolleyGAR")
+  # Sys.setenv(SHAREPOINT_FILE_NAME = "medmodus.xlsx")
+  # Sys.setenv(CONNECT_SERVER_URL = "[https://connect.yourcompany.com](https://connect.yourcompany.com)")
+  # Sys.setenv(CONNECT_API_KEY = "YOUR_CONNECT_API_KEY")
+  # Sys.setenv(PIN_NAME = "medmodus_trolleygar_data")
+  
+  update_pin_from_sharepoint()
+} else {
+  # For deployment on Posit Connect, ensure environment variables are set there
+  update_pin_from_sharepoint()
+}
+
+How to Use This Quarto Document
+Save the file: Save the content above as a .qmd file (e.g., sharepoint_updater.qmd).
+
+Dependencies: Ensure you have an renv.lock file in the same directory, or manually manage the R package dependencies (Microsoft365R, readxl, pins, dplyr).
+
+Azure AD App Registration: Complete the Azure AD App registration steps as detailed in the previous response to get your SHAREPOINT_CLIENT_ID and SHAREPOINT_CLIENT_SECRET.
+
+Deploy to Posit Connect:
+
+From your R console, navigate to the directory containing sharepoint_updater.qmd.
+
+Use rsconnect::deployApp() to publish the Quarto document. Posit Connect will automatically detect it as a Quarto document.
+
+rsconnect::deployApp(
+  appFile = "sharepoint_updater.qmd",
+  appName = "sharepoint_data_updater_qmd", # A unique name for the app on Connect
+  appTitle = "SharePoint Data Pin Updater (Quarto)",
+  account = "your-connect-server-name", # The name you set in setAccountInfo
+  server = "[https://your.connect.server.url](https://your.connect.server.url)",
+  forceUpdate = TRUE # Use TRUE if updating an existing deployment
+)
+
+Set Environment Variables: On Posit Connect, go to the "Vars" tab for your deployed Quarto document and set the environment variables (SHAREPOINT_SITE_URL, SHAREPOINT_CLIENT_ID, SHAREPOINT_CLIENT_SECRET, SHAREPOINT_FOLDER_PATH, SHAREPOINT_FILE_NAME, CONNECT_SERVER_URL, CONNECT_API_KEY, PIN_NAME). Remember to mark sensitive variables as "Secret."
+
+Schedule: Set up a schedule on Posit Connect for the Quarto document to run automatically.
+
+When this Quarto document runs on Posit Connect, it will execute the R code chunk, download the data, and update the pin. You can then use board %>% pin_read("medmodus_trolleygar_data") in your Shiny app to access the latest data.
