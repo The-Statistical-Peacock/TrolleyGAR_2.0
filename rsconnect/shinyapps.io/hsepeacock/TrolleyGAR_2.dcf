@@ -5,7 +5,7 @@ account: hsepeacock
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 14808317
-bundleId: 10325910
+bundleId: 10336689
 url: https://hsepeacock.shinyapps.io/TrolleyGAR_2/
 version: 1
 asMultiple: FALSE
