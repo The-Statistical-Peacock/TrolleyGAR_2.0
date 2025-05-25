@@ -18,18 +18,20 @@ source("helpers.R")
 
 
 # Define the UI for the application
+# Define the UI for the application
 ui <- page_fluid(
   title = "TrolleyGAR 2.0",
   
-  theme = bs_theme(fg = "rgb(8, 8, 8)", 
+  theme = bs_theme(fg = "rgb(8, 8, 8)",
                    primary = "#0048A8",
                    secondary = "#88AED6",
-                   base_font = "Arial", 
-                   heading_font = "Arial", 
-                   font_scale = NULL, 
-                   `enable-gradients` = TRUE, 
-                   `enable-shadows` = FALSE, 
-                   preset = "zephyr", 
+                   base_font = "Arial",
+                   heading_font = "Arial",
+                   font_scale = NULL,
+                   `enable-rounded` = FALSE,
+                   `enable-gradients` = TRUE,
+                   `enable-shadows` = FALSE,
+                   preset = "zephyr",
                    bg = "rgb(255,255,255)"),
   
   conditionalPanel(
@@ -42,11 +44,12 @@ ui <- page_fluid(
     layout_sidebar(
       sidebar = sidebar(
         title = "Dashboard Controls",
-          input_dark_mode(
-            id = "dark_mode_toggle",
-            mode = "light"
-          )
-        , 
+        class = 'bg-subtle-info',
+        input_dark_mode(
+          id = "dark_mode_toggle",
+          mode = "light"
+        )
+        ,
         h3("Region and Hospitals"),
         
         selectInput(
@@ -59,27 +62,25 @@ ui <- page_fluid(
         selectInput(
           inputId = "selected_hospital",
           label = "Select Hospital:",
-          choices = c("All" = "", sort(unique(medmodus$Hospital))), 
+          choices = c("All" = "", sort(unique(medmodus$Hospital))),
           selected = ""
         )
         
-
-      ),
-      layout_column_wrap(
-        width = 1/1,
         
-        # --- Row 1: Key Performance Indicators ---
-        card(
-          card_header("8am Trolleys - Key Metrics",
-                      class = 'bg-primary'),
-          
+      ),
+      # START OF CHANGES
+      navset_card_underline(
+        # Tab 1: 8am Trolleys
+        nav_panel(
+          title = "8am Trolleys",
+          card_header("Key Metrics", class = 'bg-primary'),
           card_body(
             layout_columns(
               col_widths = c(4, 4, 4),
               # Metric 1: Current 8am Trolleys
               card(
                 class = "text-center",
-                card_header(h5("Current 8am"), 
+                card_header(h5("Current 8am"),
                             class = 'bg-secondary'),
                 card_body(
                   h2(textOutput("current_8am_metric"))
@@ -89,7 +90,7 @@ ui <- page_fluid(
               card(
                 class = "text-center",
                 card_header(h5("Average 8am YTD (2025)"),
-                            class = 'bg-secondary'), 
+                            class = 'bg-secondary'),
                 card_body(
                   h2(textOutput("average_8am_metric"))
                 )
@@ -98,7 +99,7 @@ ui <- page_fluid(
               card(
                 class = "text-center",
                 card_header(h5("% Under 9 Hrs"),
-                            class = 'bg-secondary'), 
+                            class = 'bg-secondary'),
                 card_body(
                   h2(textOutput("under_9hrs_8am_metric"))
                 )
@@ -112,33 +113,31 @@ ui <- page_fluid(
             )
           )
         ),
-        # --- End Row 1 ---
-        
-        # Row 2 Placeholder (remains as is)
-        card(
+        # Tab 2: 2pm Trolleys
+        nav_panel(
+          title = "2pm Trolleys",
           card_header("2pm Trolleys"),
           card_body(
-            p("Content for the second row goes here. This might be a larger plot or table."),
-            plotOutput("distPlot")
+            p("Content for the second row goes here. This might be a larger plot or table.")
           )
-        )
-        ,
-        
-        # Row 3 Placeholder (remains as is)
-        card(
+        ),
+        # Tab 3: 8pm Trolleys
+        nav_panel(
+          title = "8pm Trolleys",
           card_header("8pm Trolleys"),
           card_body(
             p("Content for the third row goes here. Perhaps more detailed tables or another set of filters.")
           )
         )
       )
+      # END OF CHANGES
     )
   )
 )
-
 # Define the server logic
 server <- function(input, output, session) {
 
+  # --- Dashboard Server Logic (runs only when authenticated) ---
   authenticated_status <- loginServer("auth")
   
   output$auth_authenticated <- reactive({
@@ -224,18 +223,9 @@ server <- function(input, output, session) {
   # --- End Outputs for Row 1 Metrics ---
   
   
-  # --- Dashboard Server Logic (runs only when authenticated) ---
+
   
-  output$distPlot <- renderPlot({
-    req(authenticated_status())
-    
-    current_data <- filtered_medmodus()
-    
-    x    <- faithful[, 2]
-    bins <- seq(min(x), max(x), length.out = 30 + 1)
-    hist(x, breaks = bins, col = 'darkgray', border = 'white',
-         main = paste("Old Faithful (Filtered Data Rows:", nrow(current_data), ")"))
-  })
+
   
   # --- End Dashboard Server Logic ---
 }
