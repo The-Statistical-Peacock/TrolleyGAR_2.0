@@ -22,7 +22,8 @@ ui <- page_fluid(
   title = "TrolleyGAR 2.0",
   
   theme = bs_theme(fg = "rgb(8, 8, 8)", 
-                   primary = "#0048A8", 
+                   primary = "#0048A8",
+                   secondary = "#88AED6",
                    base_font = "Arial", 
                    heading_font = "Arial", 
                    font_scale = NULL, 
@@ -69,14 +70,17 @@ ui <- page_fluid(
         
         # --- Row 1: Key Performance Indicators ---
         card(
-          card_header("8am Trolleys - Key Metrics"),
+          card_header("8am Trolleys - Key Metrics",
+                      class = 'bg-primary'),
+          
           card_body(
             layout_columns(
               col_widths = c(4, 4, 4),
               # Metric 1: Current 8am Trolleys
               card(
                 class = "text-center",
-                card_header(h5("Current 8am")),
+                card_header(h5("Current 8am"), 
+                            class = 'bg-secondary'),
                 card_body(
                   h2(textOutput("current_8am_metric"))
                 )
@@ -84,7 +88,8 @@ ui <- page_fluid(
               # Metric 2: Average 8am Trolleys
               card(
                 class = "text-center",
-                card_header(h5("Average 8am YTD (2025)")), 
+                card_header(h5("Average 8am YTD (2025)"),
+                            class = 'bg-secondary'), 
                 card_body(
                   h2(textOutput("average_8am_metric"))
                 )
@@ -92,7 +97,8 @@ ui <- page_fluid(
               # Metric 3: Under 9 Hours 8am Trolleys
               card(
                 class = "text-center",
-                card_header(h5("% Under 9 Hrs")), 
+                card_header(h5("% Under 9 Hrs"),
+                            class = 'bg-secondary'), 
                 card_body(
                   h2(textOutput("under_9hrs_8am_metric"))
                 )

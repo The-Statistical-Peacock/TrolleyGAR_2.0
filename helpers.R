@@ -83,7 +83,7 @@ plot_trolley_trend <- function(data, value_column) {
   library(plotly)
   
   plot_data <- data %>%
-    filter(year(Date) == 2025) %>%
+    filter(year(Date) == 2025) %>% # Data is already filtered for a single year
     group_by(Date) %>%
     summarise(Total_8am_Trolleys = sum(.data[[value_column]], na.rm = TRUE), .groups = "drop") %>%
     arrange(Date) %>%
@@ -116,7 +116,7 @@ plot_trolley_trend <- function(data, value_column) {
       mode = 'lines',
       line = list(color = '#0048A8', shape = "spline", smoothing = 1.3),
       text = ~sprintf(
-        "Date: %s<br>Day: %s<br>7-Day Avg: %.0f", # <-- Changed %d to %.0f
+        "Date: %s<br>Day: %s<br>7-Day Avg: %.0f",
         strftime(Date, format = "%d %b"),
         DayOfWeek,
         RollingAvg_7Day
@@ -128,9 +128,9 @@ plot_trolley_trend <- function(data, value_column) {
       y = ~RollingAvg_30Day,
       type = 'scatter',
       mode = 'lines',
-      line = list(color = '#DF8234', shape = "spline", smoothing = 1.3, dash = 'dash'),
+      line = list(color = '#4FA7AF', shape = "spline", smoothing = 1.3, dash = 'dash'),
       text = ~sprintf(
-        "Date: %s<br>Day: %s<br>30-Day Avg: %.0f", # <-- Changed %d to %.0f
+        "Date: %s<br>Day: %s<br>30-Day Avg: %.0f",
         strftime(Date, format = "%d %b"),
         DayOfWeek,
         RollingAvg_30Day
@@ -140,8 +140,18 @@ plot_trolley_trend <- function(data, value_column) {
     ) %>%
     layout(
       title = "",
-      xaxis = list(title = "", type = "date", tickformat = "%d %b", showgrid = FALSE),
-      yaxis = list(title = "Rolling Average Trolleys", showgrid = FALSE),
+      xaxis = list(
+        title = "",               
+        type = "date",
+        tickformat = "%b",          
+        dtick = "M1",               
+        ticklabelmode = "period",  
+        showgrid = FALSE
+      ),
+      yaxis = list(
+        title = "Rolling Average Trolleys",
+        showgrid = FALSE
+      ),
       margin = list(l = 50, r = 50, b = 50, t = 50),
       showlegend = TRUE
     )
