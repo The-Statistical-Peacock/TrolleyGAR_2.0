@@ -21,11 +21,15 @@ source("helpers.R")
 ui <- page_fluid(
   title = "TrolleyGAR 2.0",
   
-  theme = bs_theme(
-    version = 5,
-    bootswatch = "flatly", # This is the DEFAULT/LIGHT theme
-
-  ),
+  theme = bs_theme(fg = "rgb(8, 8, 8)", 
+                   primary = "#0048A8", 
+                   base_font = "Arial", 
+                   heading_font = "Arial", 
+                   font_scale = NULL, 
+                   `enable-gradients` = TRUE, 
+                   `enable-shadows` = FALSE, 
+                   preset = "zephyr", 
+                   bg = "rgb(255,255,255)"),
   
   conditionalPanel(
     condition = "!output.auth_authenticated",
@@ -95,7 +99,7 @@ ui <- page_fluid(
               )
             ),
             card(
-              card_header("Row 1: Additional 8am Details (e.g., trend)"),
+              card_header("7 day & 30 day Rolling Averages"),
               card_body(
                 plotlyOutput("plot_8am_trolley_trend_plot")
               )
@@ -128,7 +132,7 @@ ui <- page_fluid(
 
 # Define the server logic
 server <- function(input, output, session) {
-  
+
   authenticated_status <- loginServer("auth")
   
   output$auth_authenticated <- reactive({

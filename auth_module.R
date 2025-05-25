@@ -50,7 +50,7 @@ loginServer <- function(id) {
     observeEvent(input$login_button, {
       # Hardcoded credentials (Change To DB or FlatFILE later)
       valid_username <- "user"
-      valid_password <- "password"
+      valid_password <- "pass"
       
       # Check if entered credentials match
       if (input$username == valid_username && input$password == valid_password) {

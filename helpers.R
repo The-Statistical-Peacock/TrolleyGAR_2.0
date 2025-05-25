@@ -75,23 +75,28 @@ under_9hrs <- function(data, col1, col2, denom_col) {
 }
 
 #------------------ Plots ----------------------#
+
 plot_trolley_trend <- function(data, value_column) {
+  library(dplyr)
+  library(lubridate)
+  library(zoo)
+  library(plotly)
   
   plot_data <- data %>%
     filter(year(Date) == 2025) %>%
     group_by(Date) %>%
-    summarise(Total_8am_Trolleys = sum(.data[[value_column]], na.rm = TRUE)) %>%
-    ungroup() %>%
+    summarise(Total_8am_Trolleys = sum(.data[[value_column]], na.rm = TRUE), .groups = "drop") %>%
     arrange(Date) %>%
     mutate(
-      DayOfWeek = weekdays(Date, abbreviate = FALSE),
-      IsWeekend = ifelse(DayOfWeek %in% c("Saturday", "Sunday"), "Weekend", "Weekday")
+      RollingAvg_7Day = zoo::rollmean(Total_8am_Trolleys, k = 7, fill = NA, align = "right"),
+      RollingAvg_30Day = zoo::rollmean(Total_8am_Trolleys, k = 30, fill = NA, align = "right"),
+      DayOfWeek = weekdays(Date)
     )
   
-  if (nrow(plot_data) == 0) {
+  if (nrow(plot_data %>% filter(!is.na(RollingAvg_7Day))) == 0) {
     p <- plotly_empty() %>%
       add_annotations(
-        text = "No data for 2025 with current filters.",
+        text = "No data to calculate rolling average.",
         x = 0.5, y = 0.5,
         showarrow = FALSE,
         font = list(size = 18)
@@ -103,33 +108,48 @@ plot_trolley_trend <- function(data, value_column) {
     return(p)
   }
   
-  colors_for_bars <- c("Weekday" = "#9BAAB3", "Weekend" = "#DF8234")
-  
   p <- plot_data %>%
     plot_ly(
       x = ~Date,
-      y = ~Total_8am_Trolleys,
-      type = 'bar',
-      color = ~IsWeekend,
-      colors = colors_for_bars,
-      # --- NEW: Use text aesthetic to format hover info directly ---
-      text = ~sprintf("Date: %s<br>Day: %s<br>Trolleys: %s",
-                      strftime(Date, format = "%d %b"), # Format date for display
-                      DayOfWeek, # Directly use DayOfWeek
-                      Total_8am_Trolleys),
-      hoverinfo = "text" # Tell Plotly to use the 'text' aesthetic for hover
-      # --- END NEW ---
-      # customdata = ~DayOfWeek # No longer needed if we build hover with 'text'
+      y = ~RollingAvg_7Day,
+      type = 'scatter',
+      mode = 'lines',
+      line = list(color = '#0048A8', shape = "spline", smoothing = 1.3),
+      text = ~sprintf(
+        "Date: %s<br>Day: %s<br>7-Day Avg: %.0f", # <-- Changed %d to %.0f
+        strftime(Date, format = "%d %b"),
+        DayOfWeek,
+        RollingAvg_7Day
+      ),
+      hoverinfo = "text",
+      name = "7-Day Avg"
+    ) %>%
+    add_trace(
+      y = ~RollingAvg_30Day,
+      type = 'scatter',
+      mode = 'lines',
+      line = list(color = '#DF8234', shape = "spline", smoothing = 1.3, dash = 'dash'),
+      text = ~sprintf(
+        "Date: %s<br>Day: %s<br>30-Day Avg: %.0f", # <-- Changed %d to %.0f
+        strftime(Date, format = "%d %b"),
+        DayOfWeek,
+        RollingAvg_30Day
+      ),
+      hoverinfo = "text",
+      name = "30-Day Avg"
     ) %>%
     layout(
-      xaxis = list(title = "", type = "date", tickformat = "%d %b"),
-      yaxis = list(title = "Total Trolleys"),
+      title = "",
+      xaxis = list(title = "", type = "date", tickformat = "%d %b", showgrid = FALSE),
+      yaxis = list(title = "Rolling Average Trolleys", showgrid = FALSE),
       margin = list(l = 50, r = 50, b = 50, t = 50),
       showlegend = TRUE
     )
   
   return(p)
 }
+
+
 
 
 
