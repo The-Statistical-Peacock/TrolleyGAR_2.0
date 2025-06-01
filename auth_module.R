@@ -1,12 +1,11 @@
 # auth_module.R
 
-# Load necessary libraries for database connection
 library(shiny)
 library(bslib)
 library(DBI)
-library(duckdb) # Ensure this is installed: install.packages("duckdb")
+library(duckdb) 
 
-# UI for the login module (remains the same)
+# UI for the login module
 loginUI <- function(id) {
   ns <- NS(id) # Create a namespace for the module
   
@@ -16,7 +15,7 @@ loginUI <- function(id) {
     style = "background-color: rgb(0, 68, 57); color: white; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center;",
     div(
       style = "text-align: center; padding: 20px;",
-      h1("Welcome to TrolleyGAR 2.0", style = "color: white; font-size: 3.5rem; margin-bottom: 20px;"),
+      h1("Welcome to TrolleyGAR 2.0", style = "color: white; font-size: 2.5rem; margin-bottom: 20px;"),
       card(
         card_header("Please Enter Login Credentials", style = "color: white; font-size: 1.2rem; background-color: rgb(0, 72, 168);"),
         card_body(
@@ -61,15 +60,12 @@ loginServer <- function(id) {
       con <- NULL # Initialize connection to NULL
       tryCatch({
         # --- LOCAL DUCKDB DATABASE CONNECTION ---
-        # Define the path to your existing local DuckDB database file.
-        # Ensure 'auth_users.duckdb' is in the same directory as your app.R or auth_module.R.
         local_db_path <- "Auth_Users.duckdb" 
         
         # Connect to the local DuckDB database file
         con <- dbConnect(duckdb::duckdb(), dbdir = local_db_path)
         
         # Query your local database for user credentials
-        # IMPORTANT: Using 'user' and 'password' as your column names, and 'USERS' as table name.
         quoted_username <- dbQuoteString(con, entered_username)
         
         query <- paste0(

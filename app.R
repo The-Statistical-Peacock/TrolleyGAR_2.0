@@ -186,16 +186,6 @@ server <- function(input, output, session) {
   }, ignoreNULL = FALSE)
   
   
-  # Display selected filters (for debugging/confirmation)
-  output$current_region <- renderText({
-    paste("Selected Region:", ifelse(input$selected_region == "", "All", input$selected_region))
-  })
-  
-  output$current_hospital <- renderText({
-    paste("Selected Hospital:", ifelse(input$selected_hospital == "", "All", input$selected_hospital))
-  })
-  
-  
   # --- Outputs for Row 1 Metrics (Updated Function Calls) ---
   output$current_8am_metric <- renderText({
     req(authenticated_status(), nrow(filtered_medmodus()) > 0)
