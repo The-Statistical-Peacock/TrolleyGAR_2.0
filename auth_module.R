@@ -1,6 +1,12 @@
 # auth_module.R
 
-# UI for the login module
+# Load necessary libraries for database connection
+library(shiny)
+library(bslib)
+library(DBI)
+library(duckdb) # Ensure this is installed: install.packages("duckdb")
+
+# UI for the login module (remains the same)
 loginUI <- function(id) {
   ns <- NS(id) # Create a namespace for the module
   
@@ -48,21 +54,57 @@ loginServer <- function(id) {
     
     # Observe the login button click
     observeEvent(input$login_button, {
-      # Hardcoded credentials (Change To DB or FlatFILE later)
-      valid_username <- "user"
-      valid_password <- "pass"
+      # Get entered credentials
+      entered_username <- input$username
+      entered_password <- input$password
       
-      # Check if entered credentials match
-      if (input$username == valid_username && input$password == valid_password) {
-        authenticated(TRUE) # Set authenticated status to TRUE
-      } else {
-        # Display an error message if login fails
+      con <- NULL # Initialize connection to NULL
+      tryCatch({
+        # --- LOCAL DUCKDB DATABASE CONNECTION ---
+        # Define the path to your existing local DuckDB database file.
+        # Ensure 'auth_users.duckdb' is in the same directory as your app.R or auth_module.R.
+        local_db_path <- "Auth_Users.duckdb" 
+        
+        # Connect to the local DuckDB database file
+        con <- dbConnect(duckdb::duckdb(), dbdir = local_db_path)
+        
+        # Query your local database for user credentials
+        # IMPORTANT: Using 'user' and 'password' as your column names, and 'USERS' as table name.
+        quoted_username <- dbQuoteString(con, entered_username)
+        
+        query <- paste0(
+          "SELECT password FROM USERS WHERE username = ", # Column 'user' for username
+          quoted_username
+        )
+        
+        user_data <- dbGetQuery(con, query)
+        # --- END LOCAL DUCKDB DATABASE CONNECTION ---
+        
+        # Check if a user was found and if the password matches
+        if (nrow(user_data) == 1 && user_data$password == entered_password) {
+          authenticated(TRUE) # Set authenticated status to TRUE
+        } else {
+          # Display an error message if login fails
+          showModal(modalDialog(
+            title = "Login Failed",
+            "Invalid username or password.",
+            easyClose = TRUE
+          ))
+        }
+      }, error = function(e) {
+        # Handle database connection or query errors
         showModal(modalDialog(
-          title = "Login Failed",
-          "Invalid username or password.",
+          title = "Database Error",
+          paste0("An error occurred: ", e$message, ". Please ensure the '", local_db_path, "' file is accessible and contains a 'USERS' table with 'user' and 'password' columns."),
           easyClose = TRUE
         ))
-      }
+        print(paste0("Database connection or query error: ", e$message)) # Log the error for debugging
+      }, finally = {
+        # Disconnect from the database
+        if (!is.null(con)) {
+          dbDisconnect(con)
+        }
+      })
     })
     
     # Return the authentication status
